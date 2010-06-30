@@ -39,6 +39,7 @@
 - (BOOL)scanRestOfFalse:(NSNumber **)o;
 - (BOOL)scanRestOfTrue:(NSNumber **)o;
 - (BOOL)scanRestOfString:(NSMutableString **)o;
+- (BOOL)scanRestOfDateString:(NSDate **)o;
 
 // Cannot manage without looking at the first digit
 - (BOOL)scanNumber:(NSNumber **)o;
@@ -125,8 +126,17 @@ static char ctrl[0x22];
         case '[':
             return [self scanRestOfArray:(NSMutableArray **)o];
             break;
-        case '"':
-            return [self scanRestOfString:(NSMutableString **)o];
+        case '"':;
+			NSString *dateTest = (NSString*)[[NSString alloc] initWithBytesNoCopy:(char*)c 
+																		   length:7
+																		 encoding:NSUTF8StringEncoding 
+																	 freeWhenDone:NO];
+			if ([[dateTest lowercaseString] isEqualToString:@"\\/date("]) {
+				return [self scanRestOfDateString:(NSDate **)o];
+			} else {
+				return [self scanRestOfString:(NSMutableString **)o];
+			}
+			[dateTest release];
             break;
         case 'f':
             return [self scanRestOfFalse:(NSNumber **)o];
@@ -280,6 +290,31 @@ static char ctrl[0x22];
     
     [self addErrorWithCode:EEOF description: @"End of input while parsing object"];
     return NO;
+}
+
+- (BOOL)scanRestOfDateString:(NSDate **)o 
+{
+	NSMutableString *dateString;
+	if ([self scanRestOfString:&dateString]) {
+		/* parser for
+		 * /Date(1269342879747)/
+		 * /Date(1269342879747+0100)/
+		 */
+		if ([[dateString lowercaseString] hasPrefix:@"/date("] && [dateString hasSuffix:@")/"]) {
+			NSString *value = [[dateString substringFromIndex:6] substringToIndex:[dateString length]-8];
+			NSArray *values = [value componentsSeparatedByString:@"+"];
+			double seconds = [(NSString*)[values objectAtIndex:0] doubleValue] / 1000;
+			if ([values count] == 2) {
+				// add timezone offset if present (WCF JSON)
+				int hours = [[(NSString*)[values objectAtIndex:1] substringToIndex:2] intValue];
+				int minutes = [[(NSString*)[values objectAtIndex:1] substringFromIndex:2] intValue];
+				seconds = seconds + hours * 3600 + minutes * 60;
+			}
+			*o = [NSDate dateWithTimeIntervalSince1970:seconds];
+			return YES;
+		}
+	}
+	return NO;
 }
 
 - (BOOL)scanRestOfString:(NSMutableString **)o 
