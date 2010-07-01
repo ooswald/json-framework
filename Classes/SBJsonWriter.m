@@ -113,7 +113,11 @@ static NSMutableCharacterSet *kEscapeChars;
         } else {
             [json appendString:[fragment stringValue]];
         }
-    } else if ([fragment isKindOfClass:[NSNull class]]) {
+
+	} else if ([fragment isKindOfClass:[NSDate class]]) {
+		[json appendFormat:@"\"/Date(%qu)/\"", (long long)[(NSDate*)fragment timeIntervalSince1970]*1000]; 
+		
+	} else if ([fragment isKindOfClass:[NSNull class]]) {
         [json appendString:@"null"];
     } else if ([fragment respondsToSelector:@selector(proxyForJson)]) {
         [self appendValue:[fragment proxyForJson] into:json];
