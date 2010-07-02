@@ -297,19 +297,12 @@ static char ctrl[0x22];
 	NSMutableString *dateString;
 	if ([self scanRestOfString:&dateString]) {
 		/* parser for
-		 * /Date(1269342879747)/
-		 * /Date(1269342879747+0100)/
+		 * /Date(1269342879747[+zzzz])/
 		 */
 		if ([[dateString lowercaseString] hasPrefix:@"/date("] && [dateString hasSuffix:@")/"]) {
 			NSString *value = [[dateString substringFromIndex:6] substringToIndex:[dateString length]-8];
-			NSArray *values = [value componentsSeparatedByString:@"+"];
+			NSArray *values = [value componentsSeparatedByString:@"+"]; // ignore TZ offset
 			double seconds = [(NSString*)[values objectAtIndex:0] doubleValue] / 1000;
-			if ([values count] == 2) {
-				// add timezone offset if present (WCF JSON)
-				int hours = [[(NSString*)[values objectAtIndex:1] substringToIndex:2] intValue];
-				int minutes = [[(NSString*)[values objectAtIndex:1] substringFromIndex:2] intValue];
-				seconds = seconds + hours * 3600 + minutes * 60;
-			}
 			*o = [NSDate dateWithTimeIntervalSince1970:seconds];
 			return YES;
 		}
